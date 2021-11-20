@@ -2,10 +2,11 @@ import cv2
 import numpy as np
 from numpy.linalg import norm
 import mxnet
-from glob import glob
 from collections import namedtuple
-
-from model.Symbol_MobileFace_Identification_V3 import *
+if __name__ == "__main__":
+    from model.Symbol_MobileFace_Identification_V3 import *
+else:
+    from .model.Symbol_MobileFace_Identification_V3 import *
 
 
 class MobileFaceFeatureExtractor(object):
