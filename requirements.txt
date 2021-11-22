@@ -1,4 +1,6 @@
+gluoncv==0.10.4.post4
 mxnet==1.7.0.post2
 numpy==1.16.6
 opencv_python==4.1.0.25
-https://files.pythonhosted.org/packages/0e/ce/f8a3cff33ac03a8219768f0694c5d703c8e037e6aba2e865f9bae22ed63c/dlib-19.8.1-cp36-cp36m-win_amd64.whl#sha256=794994fa2c54e7776659fddb148363a5556468a6d5d46be8dad311722d54bfcf
+pandas==0.24.2
+dlib==19.8.1
