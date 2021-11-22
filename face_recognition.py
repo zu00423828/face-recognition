@@ -126,11 +126,11 @@ class FaceRecognition():
         #     people_feature, img_feature)
         # print(cosine_similarity_scores)
     
-        for i, (person_name, person_feature) in enumerate(zip(people_name, people_feature)):
-            score = self.get_euclidean_distance(person_feature, img_feature)
-            print(person_name,score)
-            if score < self.threshold:
-                compelte.append({'photoID': person_name, 'confidence': 1-score})
+        for (person_name, person_feature) in zip(people_name, people_feature):
+            dist = self.get_euclidean_distance(person_feature, img_feature)
+            print(person_name,dist)
+            if dist < self.threshold:
+                compelte.append({'photoID': person_name, 'confidence': 1-dist})
         return compelte
 
 
@@ -143,9 +143,9 @@ if __name__ == "__main__":
     a2 = 'test_data/101.png'
     filelist = ['test_data/3.png','test_data/101.png','test_data/0.png'
                 ]
-    people_data = facerecognition.get_feature(filelist)
+    people_data = facerecognition.get_feature(filelist)# get people feature
 
-    print(facerecognition.compare_similarity(people_data, a2))
+    print(facerecognition.compare_similarity(people_data, a2)) # similarity
 
 
     from timeit import timeit
