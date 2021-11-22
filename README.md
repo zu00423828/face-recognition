@@ -33,21 +33,13 @@ other_img是要被辨識的人臉
 ```
     from face_recognition import  FaceRecognition
     model_file = 'model/MobileFace_Identification_V3'
-    facerecognition = FaceRecognition(model_file,0.5)
-    a1=cv2.imread('test_data/a1.png')
-    a2=cv2.imread('test_data/a2.png')
-    b1=cv2.imread('test_data/b1.png')
-    b2=cv2.imread('test_data/b2.png')
-    c1=cv2.imread('test_data/c1.png')
-    d1=cv2.imread('test_data/d1.png')
-    people_feature=np.array([
-        facerecognition.get_feature(a1),
-        facerecognition.get_feature(b1),
-        facerecognition.get_feature(b2),
-        facerecognition.get_feature(c1),
-        facerecognition.get_feature(d1),
-    ])
-    print(facerecognition.compare_similarity(people_feature,a2))
+    facerecognition = FaceRecognition(model_file, 0.5)
+    a2 = 'test_data/101.png'
+    filelist = ['test_data/3.png','test_data/101.png','test_data/0.png'
+                ]
+    people_feature = facerecognition.get_feature(filelist)
+
+    print(facerecognition.compare_similarity(people_feature, a2))
 ```
 ```
 [{'photoID': 0, 'confidence': 0.53109556}, {'photoID': 3, 'confidence': 0.51740336}]

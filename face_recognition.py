@@ -38,7 +38,6 @@ def face_align(img_path):
         raise Exception('not face')       
     for result in results:
         xmin, ymin, xmax, ymax, _, _ = result
-
         size_scale = 0.75
         center_scale = 0.1
         center_shift = (ymax - ymin) * center_scale
@@ -71,7 +70,7 @@ class MobileFaceFeatureExtractor(object):
         self.model = mxnet.mod.Module(symbol=network, context=context)
         self.model.bind(for_training=False, data_shapes=[
                         ('data', (self.batch_size, 3, 112, 112))])
-        sym, arg_params, aux_params = mxnet.model.load_checkpoint(
+        _, arg_params, aux_params = mxnet.model.load_checkpoint(
             self.model_file, self.epoch)
         self.model.set_params(arg_params, aux_params)
 
@@ -136,19 +135,21 @@ class FaceRecognition():
 
 
 def test_time():
-    facerecognition.compare_similarity(people_feature,a2)
+    facerecognition.compare_similarity(people_data,a2)
+
 if __name__ == "__main__":
     model_file = 'model/MobileFace_Identification_V3'
     facerecognition = FaceRecognition(model_file, 0.5)
     a2 = 'test_data/101.png'
     filelist = ['test_data/3.png','test_data/101.png','test_data/0.png'
                 ]
-    people_feature = facerecognition.get_feature(filelist)
+    people_data = facerecognition.get_feature(filelist)
 
-    print(facerecognition.compare_similarity(people_feature, a2))
+    print(facerecognition.compare_similarity(people_data, a2))
 
 
     from timeit import timeit
     print()
-    t=timeit('test_time','from __main__ import test_time',number=3)
-    print('cost:',t)
+    number=100000
+    t=timeit('test_time','from __main__ import test_time',number=number)
+    print('average_cost:',t/number)
