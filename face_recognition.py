@@ -34,9 +34,9 @@ class MobileFaceFeatureExtractor(object):
 
 
 class FaceRecognition():
-    def __init__(self,model_file,thresold):
+    def __init__(self,model_file,threshold):
         self.face_feature_extractor = MobileFaceFeatureExtractor(model_file, 0, 1, mxnet.cpu())
-        self.thresold=thresold
+        self.threshold=threshold
     def get_feature(self,img):
         img=cv2.resize(img,(112,112))
         face_batch=[img]
@@ -48,14 +48,18 @@ class FaceRecognition():
         # result=np.dot(default_feature, new_feature) / (norm(default_feature) * norm(new_feature)) # one to one 
         result=default_feature.dot(new_feature) / (norm(default_feature,axis=1) * norm(new_feature)) # many to one
         return result
-
+    def get_euclidean_distance(feature_1,feature_2):
+        feature_1 = np.array(feature_1)
+        feature_2 = np.array(feature_2)
+        dist = np.sqrt(np.sum(np.square(feature_1 - feature_2)))
+        print(dist)
     def compare_similarity(self,people_feature,img):
         compelte=[]
         img_feature = self.get_feature(img)
         cosine_similarity_scores=self.get_cosine_similarity(people_feature, img_feature)
         print(cosine_similarity_scores)
         for i,score in enumerate(cosine_similarity_scores):
-            if score > self.thresold:
+            if score > self.threshold:
                 compelte.append({'photoID':i,'confidence':score})
         return compelte
 

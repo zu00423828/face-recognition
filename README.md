@@ -5,7 +5,7 @@ from face_recognition import  FaceRecognition
 
 # Init Object
 ```
-facerecognition = FaceRecognition(model_file,thresold)
+facerecognition = FaceRecognition(model_file,threshold)
 ```
 model_file預設為model/MobileFace_Identification_V3
 threshold預設為0.5 是信心值門檻
