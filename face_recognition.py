@@ -5,6 +5,8 @@ import mxnet
 from collections import namedtuple
 import pandas as pd
 import dlib
+# from imutils.face_utils import FaceAligner
+# from imutils.face_utils import rect_to_bb
 if __name__ == "__main__":
     from tool.Symbol_MobileFace_Identification_V3 import *
     from tool.MobileFace_Detection.mobileface_detector import MobileFaceDetection
@@ -13,7 +15,9 @@ else:
     from .tool.Symbol_MobileFace_Identification_V3 import *
     from .tool.MobileFace_Detection.mobileface_detector import MobileFaceDetection
     from .tool.mobileface_alignment import MobileFaceAlign
-
+# detector = dlib.get_frontal_face_detector()
+# predictor = dlib.shape_predictor('model/shape_predictor_68_face_landmarks.dat')
+# facerec = dlib.face_recognition_model_v1("model/dlib_face_recognition_resnet_model_v1.dat")
 class MobileFaceFeatureExtractor(object):
     def __init__(self, model_file, epoch, batch_size, context=mxnet.cpu()):
         self.model_file = model_file
@@ -45,13 +49,25 @@ class FaceRecognition():
             f'{model_dir}/MobileFace_Identification_V3', 0, 1, mxnet.cpu())
         self.bboxes_predictor = MobileFaceDetection(f'{model_dir}/mobilefacedet_v1_gluoncv.params', '')
         self.landmark_predictor = dlib.shape_predictor(f'{model_dir}/mobileface_landmark_emnme_v1.dat')
+        # self.fa= FaceAligner(predictor, desiredFaceWidth=200)
         self.align_tool = MobileFaceAlign(f'{model_dir}/mobileface_align_v1.npy')
         self.threshold = threshold
     def face_align(self,img_path): 
         '''
             get 112*112 face image is alignment
         '''
-        align_size = (112, 112) 
+        # align_size = (256,256)
+        # img_mat = cv2.imread(img_path)
+        # if img_mat is None:
+        #     print(img_path)
+        # gray=cv2.cvtColor(img_mat,cv2.COLOR_BGR2GRAY)
+        # faces = detector(gray, 0)
+        # assert len(faces)!=0,Exception('no face')
+        # for face in faces:
+        #     (x, y, w, h) = rect_to_bb(face)       
+        #     faceAligned = self.fa.align(img_mat, gray, face)
+        #     return faceAligned
+ 
         img_mat = cv2.imread(img_path)
         bboxes = self.bboxes_predictor.mobileface_detector(img_path, img_mat)
         if bboxes == None or len(bboxes) < 1:
@@ -78,14 +94,26 @@ class FaceRecognition():
         '''
             get 1*256 face vetor
         '''
+        from tqdm import tqdm
         feature_list = []
-        for item in img_paths:
-            img = self.face_align(item)
-            face_batch = np.array([img])
-            feature = self.face_feature_extractor.get_face_feature_batch(face_batch
-                )
-            feature[0] -= np.mean(feature[0])
-            feature_list.append({'filename': item, 'feature': feature[0]})
+        for item in tqdm(img_paths):
+            try:
+                img = self.face_align(item)
+                face_batch = np.array([img])
+                feature = self.face_feature_extractor.get_face_feature_batch(face_batch
+                    )
+                feature[0] -= np.mean(feature[0])
+                feature_list.append({'filename': item, 'feature': feature[0]})
+                # img_gray=cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+                # img_rgb=cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
+                # dets = detector(img_gray, 1)
+                # if (len(dets) != 0):
+                #     shape = predictor(img_gray, dets[0])
+                #     feature = facerec.compute_face_descriptor(img_rgb, shape)
+                # else:
+                #     continue
+            except Exception as  e:
+                print(item,e)
         return feature_list
 
     def get_cosine_similarity(self, default_feature, new_feature):
@@ -125,21 +153,23 @@ class FaceRecognition():
 
 
 def test_time():
-    facerecognition.compare_similarity(people_data,a2)
+    facerecognition.compare_similarity(people_data,filelist[-1])
 
 if __name__ == "__main__":
+    from glob import glob
+    from random import shuffle
+    from time import time
     model_dir = 'model'
     facerecognition = FaceRecognition(model_dir, 0.5)
-    a2 = 'test_data/101.png'
-    filelist = ['test_data/3.png','test_data/101.png','test_data/0.png'
-                ]
-    people_data = facerecognition.get_feature(filelist)# get people feature
-
-    print(facerecognition.compare_similarity(people_data, a2)) # similarity
-
-
-    from timeit import timeit
-    print()
-    number=100000
-    t=timeit('test_time','from __main__ import test_time',number=number)
-    print('average_cost:',t/number)
+    filelist=glob('test_data/face_data/*')
+    shuffle(filelist)
+    people_data = facerecognition.get_feature(filelist[:500])# get people feature
+    st=time()
+    print(facerecognition.compare_similarity(people_data, filelist[5])) # similarity
+    et=time()
+    print('cost:',f'{et-st:0.8f} s')
+    # from timeit import timeit
+    # print()
+    # number=100000
+    # t=timeit('test_time','from __main__ import test_time',number=number)
+    # print('average_cost:',t/number)
