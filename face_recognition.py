@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-from numpy.core.numeric import load
 from numpy.linalg import norm
 import mxnet
 from collections import namedtuple
@@ -14,50 +13,6 @@ else:
     from .tool.Symbol_MobileFace_Identification_V3 import *
     from .tool.MobileFace_Detection.mobileface_detector import MobileFaceDetection
     from .tool.mobileface_alignment import MobileFaceAlign
-bboxes_predictor=None
-landmark_predictor=None
-align_tool=None
-
-def load_model():
-    global bboxes_predictor
-    global landmark_predictor
-    global align_tool
-    bboxes_predictor = MobileFaceDetection('model/mobilefacedet_v1_gluoncv.params', '')
-    landmark_predictor = dlib.shape_predictor('model/mobileface_landmark_emnme_v1.dat')
-    align_tool = MobileFaceAlign('model/mobileface_align_v1.npy')
-
-def face_align(img_path):
-    landmark_num = 5
-    if bboxes_predictor is None:
-        load_model()
-    align_size = (112, 112) 
-
-    img_mat = cv2.imread(img_path)
-    results = bboxes_predictor.mobileface_detector(img_path, img_mat)
-    if results == None or len(results) < 1:
-        raise Exception('not face')       
-    for result in results:
-        xmin, ymin, xmax, ymax, _, _ = result
-        size_scale = 0.75
-        center_scale = 0.1
-        center_shift = (ymax - ymin) * center_scale
-        w_new = (ymax - ymin) * size_scale
-        h_new = (ymax - ymin) * size_scale
-        x_center = xmin + (xmax - xmin) / 2
-        y_center = ymin + (ymax - ymin) / 2 + center_shift
-        x_min = int(x_center - w_new / 2)
-        y_min = int(y_center - h_new / 2)
-        x_max = int(x_center + w_new / 2)
-        y_max = int(y_center + h_new / 2)
-        dlib_box = dlib.rectangle(x_min, y_min, x_max, y_max)
-        shape = landmark_predictor(img_mat, dlib_box)
-        points = []
-        for k in range(landmark_num):
-            points.append([shape.part(k).x, shape.part(k).y])
-        align_points = []
-        align_points.append(points)
-        align_result = align_tool.get_align(img_mat, align_points, align_size)
-        return align_result[0]
 
 class MobileFaceFeatureExtractor(object):
     def __init__(self, model_file, epoch, batch_size, context=mxnet.cpu()):
@@ -85,18 +40,50 @@ class MobileFaceFeatureExtractor(object):
         return feature
 
 class FaceRecognition():
-    def __init__(self, model_file, threshold):
+    def __init__(self, model_dir, threshold):
         self.face_feature_extractor = MobileFaceFeatureExtractor(
-            model_file, 0, 1, mxnet.cpu())
+            f'{model_dir}/MobileFace_Identification_V3', 0, 1, mxnet.cpu())
+        self.bboxes_predictor = MobileFaceDetection(f'{model_dir}/mobilefacedet_v1_gluoncv.params', '')
+        self.landmark_predictor = dlib.shape_predictor(f'{model_dir}/mobileface_landmark_emnme_v1.dat')
+        self.align_tool = MobileFaceAlign(f'{model_dir}/mobileface_align_v1.npy')
         self.threshold = threshold
-
-    def get_feature(self, img_paths):
+    def face_align(self,img_path): 
+        '''
+            get 112*112 face image is alignment
+        '''
+        align_size = (112, 112) 
+        img_mat = cv2.imread(img_path)
+        bboxes = self.bboxes_predictor.mobileface_detector(img_path, img_mat)
+        if bboxes == None or len(bboxes) < 1:
+            raise Exception('not face')       
+        for bbox in bboxes:
+            xmin, ymin, xmax, ymax, _, _ = bbox
+            size_scale = 0.75
+            center_scale = 0.1
+            center_shift = (ymax - ymin) * center_scale
+            w_new = (ymax - ymin) * size_scale
+            h_new = (ymax - ymin) * size_scale
+            x_center = xmin + (xmax - xmin) / 2
+            y_center = ymin + (ymax - ymin) / 2 + center_shift
+            x_min = int(x_center - w_new / 2)
+            y_min = int(y_center - h_new / 2)
+            x_max = int(x_center + w_new / 2)
+            y_max = int(y_center + h_new / 2)
+            dlib_box = dlib.rectangle(x_min, y_min, x_max, y_max)
+            shape = self.landmark_predictor(img_mat, dlib_box).parts()
+            points = [[p.x,p.y] for p in shape]
+            align_result = self.align_tool.get_align(img_mat, [points], align_size)
+            return align_result[0]
+    def get_feature(self, img_paths):  
+        '''
+            get 1*256 face vetor
+        '''
         feature_list = []
         for item in img_paths:
-            img = face_align(item)
-            face_batch = [img]
-            feature = self.face_feature_extractor.get_face_feature_batch(
-                np.array(face_batch))
+            img = self.face_align(item)
+            face_batch = np.array([img])
+            feature = self.face_feature_extractor.get_face_feature_batch(face_batch
+                )
             feature[0] -= np.mean(feature[0])
             feature_list.append({'filename': item, 'feature': feature[0]})
         return feature_list
@@ -117,6 +104,9 @@ class FaceRecognition():
 
 
     def compare_similarity(self, people_data, img):
+        '''
+            people feature and new_img make similarity
+        '''
         df = pd.DataFrame(people_data)
         people_name = df['filename'].tolist()
         people_feature = np.array(df['feature'].tolist())
@@ -138,8 +128,8 @@ def test_time():
     facerecognition.compare_similarity(people_data,a2)
 
 if __name__ == "__main__":
-    model_file = 'model/MobileFace_Identification_V3'
-    facerecognition = FaceRecognition(model_file, 0.5)
+    model_dir = 'model'
+    facerecognition = FaceRecognition(model_dir, 0.5)
     a2 = 'test_data/101.png'
     filelist = ['test_data/3.png','test_data/101.png','test_data/0.png'
                 ]
