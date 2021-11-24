@@ -5,6 +5,7 @@ import mxnet
 from collections import namedtuple
 import pandas as pd
 import dlib
+import os
 # from imutils.face_utils import FaceAligner
 # from imutils.face_utils import rect_to_bb
 if __name__ == "__main__":
@@ -69,12 +70,13 @@ class FaceRecognition():
         #     return faceAligned
  
         img_mat = cv2.imread(img_path)
+        filename=os.path.basename(img_path)
         bboxes = self.bboxes_predictor.mobileface_detector(img_path, img_mat)
         if bboxes == None or len(bboxes) < 1:
             raise Exception('not face')       
         for bbox in bboxes:
             xmin, ymin, xmax, ymax, _, _ = bbox
-            size_scale = 0.75
+            size_scale = 1
             center_scale = 0.1
             center_shift = (ymax - ymin) * center_scale
             w_new = (ymax - ymin) * size_scale
@@ -89,6 +91,7 @@ class FaceRecognition():
             shape = self.landmark_predictor(img_mat, dlib_box).parts()
             points = [[p.x,p.y] for p in shape]
             align_result = self.align_tool.get_align(img_mat, [points], align_size)
+            cv2.imwrite(f'test_data/dump_data/{filename}',align_result[0])
             return align_result[0]
     def get_feature(self, img_paths):  
         '''
@@ -120,14 +123,18 @@ class FaceRecognition():
         # result=np.dot(default_feature, new_feature) / (norm(default_feature) * norm(new_feature)) # one to one
         result = default_feature.dot(
             new_feature) / (norm(default_feature, axis=1) * norm(new_feature))  # many to one
+        # result=np.sqrt(2*(1-result))
+        result=0.5+0.5*result
         return result
 
     def get_euclidean_distance(self, feature_1, feature_2):
         # feature_1 = np.array(feature_1)
         # feature_2 = np.array(feature_2)
         # dist = 1/(1+dist)
-        dist=norm(feature_1-feature_2)
-        # dist = np.sqrt(np.sum(np.square(feature_1 - feature_2)))
+        # feature_1=norm(feature_1)
+        # feature_2=norm(feature_2)
+        dist = np.sqrt(np.sum(np.square(feature_1 - feature_2)))
+        dist=1-(1/(1+dist))# norm 0-1
         return dist
 
 
@@ -143,12 +150,14 @@ class FaceRecognition():
         cosine_similarity_scores = self.get_cosine_similarity(
             people_feature, img_feature)
         print(cosine_similarity_scores)
+        print('min',np.min(cosine_similarity_scores),'max',np.max(cosine_similarity_scores))
     
         for (person_name, person_feature,score) in zip(people_name, people_feature,cosine_similarity_scores):
             dist = self.get_euclidean_distance(person_feature, img_feature)
             print(person_name,dist,score)
-            if dist < self.threshold and score >0.5:
-                compelte.append({'photoID': person_name, 'confidence': 1-dist+score})
+            if  score >self.threshold and dist <0.:
+                print(score,dist)
+                compelte.append({'photoID': person_name, 'confidence': dist,'score':score})
         return compelte
 
 
@@ -160,13 +169,14 @@ if __name__ == "__main__":
     from random import shuffle
     from time import time
     model_dir = 'model'
-    facerecognition = FaceRecognition(model_dir, 0.9)
-    filelist=glob('test_data/*.png') #face_data/*')
+    facerecognition = FaceRecognition(model_dir, 0.6)
+    filelist=glob('test_data/face_data/*')
     shuffle(filelist)
     people_data = facerecognition.get_feature(filelist[:500])# get people feature
-    st=time()
     print(filelist[5])
-    print(facerecognition.compare_similarity(people_data, filelist[5])) # similarity
+    st=time()
+    facerecognition.compare_similarity(people_data, filelist[5])
+    # print(facerecognition.compare_similarity(people_data, filelist[5])) # similarity
     et=time()
     print('cost:',f'{et-st:0.8f} s')
     # from timeit import timeit
