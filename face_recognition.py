@@ -92,7 +92,18 @@ class FaceRecognition():
             points = [[p.x,p.y] for p in shape]
             align_result = self.align_tool.get_align(img_mat, [points], align_size)
             cv2.imwrite(f'test_data/dump_data/{filename}',align_result[0])
-            return align_result[0]
+            points=np.array(points)
+            eye_dist=np.linalg.norm(points[0]-points[1])/w_new
+            lefteye2noise=np.linalg.norm(points[0]-points[2])/h_new
+            righteye2noise=np.linalg.norm(points[1]-points[2])/h_new
+            eye2noise_dist=np.linalg.norm(((points[0]+points[1])/2)-points[2])/h_new
+            noise2leftmouth=np.linalg.norm(points[2]-points[3])/h_new
+            noise2rghtitmouth=np.linalg.norm(points[3]-points[4])/h_new
+            mouth_dist=np.linalg.norm(points[3]-points[4])/w_new
+            # print(type(mouth_dist))
+            result=np.array([eye_dist,lefteye2noise,righteye2noise,eye2noise_dist,noise2leftmouth,noise2rghtitmouth,mouth_dist])
+            # return align_result[0]
+            return result
     def get_feature(self, img_paths):  
         '''
             get 1*256 face vetor
@@ -101,12 +112,13 @@ class FaceRecognition():
         feature_list = []
         for item in tqdm(img_paths):
             try:
-                img = self.face_align(item)
-                face_batch = np.array([img])
-                feature = self.face_feature_extractor.get_face_feature_batch(face_batch
-                    )
-                feature[0] -= np.mean(feature[0])
-                feature_list.append({'filename': item, 'feature': feature[0]})
+                feature = self.face_align(item)
+                
+                # face_batch = np.array([img])
+                # feature = self.face_feature_extractor.get_face_feature_batch(face_batch
+                #     )
+                # feature[0] -= np.mean(feature[0])
+                feature_list.append({'filename': item, 'feature': feature})
                 # img_gray=cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
                 # img_rgb=cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
                 # dets = detector(img_gray, 1)
@@ -170,12 +182,12 @@ if __name__ == "__main__":
     from time import time
     model_dir = 'model'
     facerecognition = FaceRecognition(model_dir, 0.6)
-    filelist=glob('test_data/face_data/*')
+    filelist=glob('test_data/*')#face_data/*')
     shuffle(filelist)
     people_data = facerecognition.get_feature(filelist[:500])# get people feature
-    print(filelist[5])
+    print('comparefile','test_data/3.png')
     st=time()
-    facerecognition.compare_similarity(people_data, filelist[5])
+    facerecognition.compare_similarity(people_data, 'test_data/3.png')
     # print(facerecognition.compare_similarity(people_data, filelist[5])) # similarity
     et=time()
     print('cost:',f'{et-st:0.8f} s')
