@@ -43,7 +43,8 @@ class MobileFaceDetection():
             [...],...].
         """        
         result_list = [] 
-        x, img = presets.yolo.load_test(image_dir, short=self._image_short)
+        # x, img = presets.yolo.load_test(image_dir, short=self._image_short)
+        x, img = presets.yolo.transform_test(mx.nd.array(image_mat), short=self._image_short)
         x = x.as_in_context(self.ctx[0])
         # ids, scores, bboxes = [xx[0].asnumpy() for xx in net(x)]
         result =  self.net(x)
