@@ -1,4 +1,5 @@
 import cv2
+from mxnet.runtime import Feature
 import numpy as np
 from numpy.linalg import norm
 import mxnet
@@ -6,6 +7,8 @@ from collections import namedtuple
 import pandas as pd
 import dlib
 import os
+from sklearn import svm
+from torch._C import dtype
 # from imutils.face_utils import FaceAligner
 # from imutils.face_utils import rect_to_bb
 if __name__ == "__main__":
@@ -53,24 +56,13 @@ class FaceRecognition():
         # self.fa= FaceAligner(predictor, desiredFaceWidth=200)
         self.align_tool = MobileFaceAlign(f'{model_dir}/mobileface_align_v1.npy')
         self.threshold = threshold
+        
     def face_align(self,img_path): 
         '''
             get 112*112 face image is alignment
         '''
         align_size = (112,112)
-        # img_mat = cv2.imread(img_path)
-        # if img_mat is None:
-        #     print(img_path)
-        # gray=cv2.cvtColor(img_mat,cv2.COLOR_BGR2GRAY)
-        # faces = detector(gray, 0)
-        # assert len(faces)!=0,Exception('no face')
-        # for face in faces:
-        #     (x, y, w, h) = rect_to_bb(face)       
-        #     faceAligned = self.fa.align(img_mat, gray, face)
-        #     return faceAligned
- 
         img_mat = cv2.imread(img_path)
-        filename=os.path.basename(img_path)
         bboxes = self.bboxes_predictor.mobileface_detector(img_path, img_mat)
         if bboxes == None or len(bboxes) < 1:
             raise Exception('not face')       
@@ -87,23 +79,27 @@ class FaceRecognition():
             y_min = int(y_center - h_new / 2)
             x_max = int(x_center + w_new / 2)
             y_max = int(y_center + h_new / 2)
+            # boxes=[(y_min,x_max,y_max,x_min)]
+            # rgb = cv2.cvtColor(img_mat, cv2.COLOR_BGR2RGB)
+            # embeddings = face_recognition.face_encodings(rgb, boxes)
             dlib_box = dlib.rectangle(x_min, y_min, x_max, y_max)
             shape = self.landmark_predictor(img_mat, dlib_box).parts()
             points = [[p.x,p.y] for p in shape]
             align_result = self.align_tool.get_align(img_mat, [points], align_size)
-            cv2.imwrite(f'test_data/dump_data/{filename}',align_result[0])
-            points=np.array(points)
-            eye_dist=np.linalg.norm(points[0]-points[1])/w_new
-            lefteye2noise=np.linalg.norm(points[0]-points[2])/h_new
-            righteye2noise=np.linalg.norm(points[1]-points[2])/h_new
-            eye2noise_dist=np.linalg.norm(((points[0]+points[1])/2)-points[2])/h_new
-            noise2leftmouth=np.linalg.norm(points[2]-points[3])/h_new
-            noise2rghtitmouth=np.linalg.norm(points[3]-points[4])/h_new
-            mouth_dist=np.linalg.norm(points[3]-points[4])/w_new
-            # print(type(mouth_dist))
-            result=np.array([eye_dist,lefteye2noise,righteye2noise,eye2noise_dist,noise2leftmouth,noise2rghtitmouth,mouth_dist])
-            # return align_result[0]
-            return result
+            # cv2.imwrite(f'test_data/dump_data/{filename}',align_result[0])
+            # points=np.array(points)
+            # eye_dist=np.linalg.norm(points[0]-points[1])/w_new
+            # lefteye2noise=np.linalg.norm(points[0]-points[2])/h_new
+            # righteye2noise=np.linalg.norm(points[1]-points[2])/h_new
+            # eye2noise_dist=np.linalg.norm(((points[0]+points[1])/2)-points[2])/h_new
+            # noise2leftmouth=np.linalg.norm(points[2]-points[3])/h_new
+            # noise2rghtitmouth=np.linalg.norm(points[3]-points[4])/h_new
+            # mouth_dist=np.linalg.norm(points[3]-points[4])/w_new
+            # # print(type(mouth_dist))
+            # result=np.array([eye_dist,lefteye2noise,righteye2noise,eye2noise_dist,noise2leftmouth,noise2rghtitmouth,mouth_dist])
+            return align_result[0]
+            
+            # return embeddings
     def get_feature(self, img_paths):  
         '''
             get 1*256 face vetor
@@ -112,13 +108,14 @@ class FaceRecognition():
         feature_list = []
         for item in tqdm(img_paths):
             try:
-                feature = self.face_align(item)
+                img = self.face_align(item)
                 
-                # face_batch = np.array([img])
-                # feature = self.face_feature_extractor.get_face_feature_batch(face_batch
-                #     )
+                face_batch = np.array([img])
+                feature = self.face_feature_extractor.get_face_feature_batch(face_batch
+                    )
+                
                 # feature[0] -= np.mean(feature[0])
-                feature_list.append({'filename': item, 'feature': feature})
+                feature_list.append({'filename': item, 'feature': feature[0]})
                 # img_gray=cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
                 # img_rgb=cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
                 # dets = detector(img_gray, 1)
@@ -129,6 +126,7 @@ class FaceRecognition():
                 #     continue
             except Exception as  e:
                 print(item,e)
+        # print(feature_list)
         return feature_list
 
     def get_cosine_similarity(self, default_feature, new_feature):
@@ -158,18 +156,26 @@ class FaceRecognition():
         people_name = df['filename'].tolist()
         people_feature = np.array(df['feature'].tolist())
         compelte = []
-        img_feature = self.get_feature([img])[0]["feature"]
-        cosine_similarity_scores = self.get_cosine_similarity(
-            people_feature, img_feature)
-        print(cosine_similarity_scores)
-        print('min',np.min(cosine_similarity_scores),'max',np.max(cosine_similarity_scores))
+        img_feature = self.get_feature([img])[0]['feature']
+        # print(img_feature)
+        model=svm.SVC(probability=False,max_iter=10000)
+        y=np.linspace(0,len(people_feature)-1,len(people_feature))
+        model.fit(people_feature,y)
+        y_pred=model.predict(img_feature.reshape(1,-1))
+        print(y_pred)
+        # matches = face_recognition.compare_faces(people_feature, img_feature)
+        # cosine_similarity_scores = self.get_cosine_similarity(
+        #     people_feature, img_feature)
+        # print(cosine_similarity_scores)
+        # print('min',np.min(cosine_similarity_scores),'max',np.max(cosine_similarity_scores))
     
-        for (person_name, person_feature,score) in zip(people_name, people_feature,cosine_similarity_scores):
-            dist = self.get_euclidean_distance(person_feature, img_feature)
-            print(person_name,dist,score)
-            if  score >self.threshold and dist <0.:
-                print(score,dist)
-                compelte.append({'photoID': person_name, 'confidence': dist,'score':score})
+        # for (person_name, person_feature,score) in zip(people_name, people_feature,cosine_similarity_scores):
+        #     dist = self.get_euclidean_distance(person_feature, img_feature)
+        #     print(person_name,dist,score)
+        #     if  score >self.threshold and dist <0.:
+        #         print(score,dist)
+        #         compelte.append({'photoID': person_name, 'confidence': dist,'score':score})
+        compelte.append({'photoID': people_name[int(y_pred[0])], 'confidence': 0})
         return compelte
 
 
@@ -182,13 +188,16 @@ if __name__ == "__main__":
     from time import time
     model_dir = 'model'
     facerecognition = FaceRecognition(model_dir, 0.6)
-    filelist=glob('test_data/*')#face_data/*')
+    filelist=glob('test_data/face_data/*')#face_data/*')
     shuffle(filelist)
     people_data = facerecognition.get_feature(filelist[:500])# get people feature
-    print('comparefile','test_data/3.png')
+    print('comparefile','test_data/e1.png')
+    
+
+    
     st=time()
-    facerecognition.compare_similarity(people_data, 'test_data/3.png')
-    # print(facerecognition.compare_similarity(people_data, filelist[5])) # similarity
+    # facerecognition.compare_similarity(people_data, 'test_data/e1.png')
+    print(facerecognition.compare_similarity(people_data,  'test_data/e1.png')) # similarity
     et=time()
     print('cost:',f'{et-st:0.8f} s')
     # from timeit import timeit

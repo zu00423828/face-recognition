@@ -38,7 +38,7 @@ def face_align(img_mat):
         return align_result[0]
 videolist=glob('video/*.mp4')
 dump_dir='dump_video_frame'
-for item in videolist[26:]:
+for item in videolist[35:]:
     # name=re.match('\S+(?=_\d+.mp4)',item).group(0)
     name=os.path.basename(item).replace('.mp4','_dir')
     video=cv2.VideoCapture(item)

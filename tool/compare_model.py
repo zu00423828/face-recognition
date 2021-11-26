@@ -112,13 +112,13 @@ if __name__=='__main__':
     dataset=DataSet('../dump_video_frame')#DataSet('LFW-Aligned-100Pair')
     
     optimizer=optim.Adam(model.parameters(),lr=1e-4)
-    loss_fuc=nn.()
+    loss_fuc=nn.BCEWithLogitsLoss()
     batch_size=16
     max_epoch=200
     dl=DataLoader(dataset,batch_size=batch_size,drop_last=True,shuffle=True)
     face_feature_extractor = MobileFaceFeatureExtractor(
             '../model/MobileFace_Identification_V3', 0, 2, mxnet.cpu())
-    # model=torch.load('checkpoint.pth')
+    model=torch.load('checkpoint.pth')
     train()
     # val()
 
