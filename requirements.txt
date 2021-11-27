@@ -3,4 +3,7 @@ mxnet==1.7.0.post2
 numpy==1.16.6
 opencv_python==4.1.0.25
 pandas==0.24.2
+Keras==2.1.6
+scipy==1.4.1
+tqdm==4.59.0
 dlib==19.8.1

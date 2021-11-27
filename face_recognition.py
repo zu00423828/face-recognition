@@ -10,13 +10,12 @@ import numpy as np
 import pandas as pd
 from scipy.spatial import distance
 from keras.models import load_model
-PADDING = 50
 from tool.MobileFace_Detection.mobileface_detector import MobileFaceDetection
-cascade_path='model/haarcascade_frontalface_default.xml'
-model_path = 'model/facenet_keras.h5'
 image_size = 160
-model = load_model(model_path)
+
 bboxes_predictor = MobileFaceDetection('model/mobilefacedet_v1_gluoncv.params', '')
+model_path = 'model/facenet_keras.h5'
+model = load_model(model_path)
 def l2_normalize(x, axis=-1, epsilon=1e-10):
 
     output = x / np.sqrt(np.maximum(np.sum(np.square(x), axis=axis, keepdims=True), epsilon))
@@ -36,7 +35,7 @@ def prewhiten(x):
     std_adj = np.maximum(std, 1.0/np.sqrt(size))
     y = (x - mean) / std_adj
     return y
-def align_image(img, margin):
+def align_image(img):
     bboxes = bboxes_predictor.mobileface_detector('', img)
     if bboxes == None or len(bboxes) < 1:
         raise Exception('not face')       
@@ -92,7 +91,7 @@ class FaceRecognition():
             img=cv2.imread(item)
             # img=cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
             try:
-                img=align_image(img,6)
+                img=align_image(img)
                 white_img=prewhiten(img)
                 white_img= white_img[np.newaxis,:]
                 feature = l2_normalize(np.concatenate(model.predict(white_img)))
