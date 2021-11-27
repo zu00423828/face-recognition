@@ -82,7 +82,7 @@ class FaceRecognition():
     def __init__(self, model_dir, threshold):
         self.threshold = threshold
         if bboxes_predictor is None:
-            load_pretrain_model(model_dir,use_cv2_bbox)
+            load_pretrain_model(model_dir)
     def get_feature(self, img_paths):  
         '''
             get 128 face vetor
