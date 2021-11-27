@@ -12,10 +12,14 @@ from scipy.spatial import distance
 from keras.models import load_model
 from tool.MobileFace_Detection.mobileface_detector import MobileFaceDetection
 image_size = 160
+bboxes_predictor = None
+feature_extractor = None
+def load_pretrain_model(model_dir):
+    global bboxes_predictor
+    global feature_extractor
+    bboxes_predictor = MobileFaceDetection(f'{model_dir}/mobilefacedet_v1_gluoncv.params', '')
 
-bboxes_predictor = MobileFaceDetection('model/mobilefacedet_v1_gluoncv.params', '')
-model_path = 'model/facenet_keras.h5'
-model = load_model(model_path)
+    feature_extractor = load_model(f'{model_dir}/facenet_keras.h5')
 def l2_normalize(x, axis=-1, epsilon=1e-10):
 
     output = x / np.sqrt(np.maximum(np.sum(np.square(x), axis=axis, keepdims=True), epsilon))
@@ -62,9 +66,7 @@ def align_image(img):
         return aligned
             
     # cascade = cv2.CascadeClassifier(cascade_path)
-
     # faces = cascade.detectMultiScale(img, scaleFactor=1.1, minNeighbors=3)
-
     # if(len(faces)>0):
     #     (x, y, w, h) = faces[0]
     #     face = img[y:y+h, x:x+w]
@@ -78,9 +80,9 @@ def align_image(img):
 
 class FaceRecognition():
     def __init__(self, model_dir, threshold):
-
         self.threshold = threshold
-
+        if bboxes_predictor is None:
+            load_pretrain_model(model_dir,use_cv2_bbox)
     def get_feature(self, img_paths):  
         '''
             get 128 face vetor
@@ -94,7 +96,7 @@ class FaceRecognition():
                 img=align_image(img)
                 white_img=prewhiten(img)
                 white_img= white_img[np.newaxis,:]
-                feature = l2_normalize(np.concatenate(model.predict(white_img)))
+                feature = l2_normalize(np.concatenate(feature_extractor.predict(white_img)))
                 feature_list.append({'filename': item, 'feature': feature})
             #     img=cv2.imread(item)
             #     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
