@@ -1,175 +1,184 @@
-import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"   #disable gpu
-from keras import backend as K
-import time
-K.set_image_data_format('channels_first')
-import cv2
-import os
-import glob
-import numpy as np
-import pandas as pd
-from scipy.spatial import distance
-from keras.models import load_model
-from tool.MobileFace_Detection.mobileface_detector import MobileFaceDetection
-image_size = 160
+import cv2 
+import os 
+import numpy as np 
+from PIL import Image
+import pickle
 
-bboxes_predictor = MobileFaceDetection('model/mobilefacedet_v1_gluoncv.params', '')
-model_path = 'model/facenet_keras.h5'
-model = load_model(model_path)
-def l2_normalize(x, axis=-1, epsilon=1e-10):
-
-    output = x / np.sqrt(np.maximum(np.sum(np.square(x), axis=axis, keepdims=True), epsilon))
-
-    return output
-def prewhiten(x):
-    if x.ndim == 4:
-        axis = (1, 2, 3)
-        size = x[0].size
-    elif x.ndim == 3:
-        axis = (0, 1, 2)
-        size = x.size
-    else:
-        raise ValueError('Dimension should be 3 or 4')
-    mean = np.mean(x, axis=axis, keepdims=True)
-    std = np.std(x, axis=axis, keepdims=True)
-    std_adj = np.maximum(std, 1.0/np.sqrt(size))
-    y = (x - mean) / std_adj
-    return y
-def align_image(img):
-    bboxes = bboxes_predictor.mobileface_detector('', img)
-    if bboxes == None or len(bboxes) < 1:
-        raise Exception('not face')       
-    for bbox in bboxes:
-        xmin, ymin, xmax, ymax, _, _ = bbox
-        size_scale = 1
-        center_scale = 0.1
-        center_shift = (ymax - ymin) * center_scale
-        w_new = (ymax - ymin) * size_scale
-        h_new = (ymax - ymin) * size_scale
-        x_center = xmin + (xmax - xmin) / 2
-        y_center = ymin + (ymax - ymin) / 2 + center_shift
-        x_min = int(x_center - w_new / 2)
-        y_min = int(y_center - h_new / 2)
-        x_max = int(x_center + w_new / 2)
-        y_max = int(y_center + h_new / 2)
-        ymin=max(0,y_min)
-        y_max=min(ymax,img.shape[0])
-        x_min=max(0,x_min)
-        y_max=min(ymax,img.shape[0])
-        x_max=min(x_max,img.shape[1])
-        face=img[y_min:y_max,x_min:x_max]
-        aligned=cv2.resize(face,(160,160))
-        return aligned
-            
-    # cascade = cv2.CascadeClassifier(cascade_path)
-
-    # faces = cascade.detectMultiScale(img, scaleFactor=1.1, minNeighbors=3)
-
-    # if(len(faces)>0):
-    #     (x, y, w, h) = faces[0]
-    #     face = img[y:y+h, x:x+w]
-    #     faceMargin = np.zeros((h+margin*2, w+margin*2, 3), dtype = np.uint8)
-    #     faceMargin[margin:margin+h, margin:margin+w] = face
-    #     aligned = cv2.resize(faceMargin, (image_size, image_size))
-    #     return aligned
-    # else:
-    #     print('is not face')
-    #     return None
-
-class FaceRecognition():
-    def __init__(self, model_dir, threshold):
-
-        self.threshold = threshold
-
-    def get_feature(self, img_paths):  
-        '''
-            get 128 face vetor
-        '''
-        from tqdm import tqdm
-        feature_list = []
-        for item in tqdm(img_paths):
-            img=cv2.imread(item)
-            # img=cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
-            try:
-                img=align_image(img)
-                white_img=prewhiten(img)
-                white_img= white_img[np.newaxis,:]
-                feature = l2_normalize(np.concatenate(model.predict(white_img)))
-                feature_list.append({'filename': item, 'feature': feature})
-            #     img=cv2.imread(item)
-            #     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            #     faces = self.face_cascade.detectMultiScale(gray, 1.3, 5)
-            #     for (x, y, w, h) in faces:
-            #         x1 = x-PADDING
-            #         y1 = y-PADDING
-            #         x2 = x+w+PADDING
-            #         y2 = y+h+PADDING
-            #         img = cv2.rectangle(img,(x1, y1),(x2, y2),(255,0,0),2)
-            #         feature = img_path_to_encoding(item, self.FRmodel)
-
-            #     feature_list.append({'filename': item, 'feature': feature})
-            except Exception as  e:
-                print(item,e)
-        # print(feature_list)
-        return feature_list
+import dlib
+from face_align import FaceAligner
+from imutils.face_utils import rect_to_bb
+import imutils
+ 
+detector = dlib.get_frontal_face_detector()
+predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
+fa = FaceAligner(predictor, desiredFaceWidth=256)
 
 
 
 
-    def compare_similarity(self, people_data, img):
-        '''
-            people feature and new_img make similarity
-        '''
-        df = pd.DataFrame(people_data)
-        people_name = df['filename'].tolist()
-        people_feature = np.array(df['feature'].tolist())
-        compelte = []
+
+def face_align(filename):
+    img = cv2.imread(filename)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    faces = detector(gray, 1)
+    name=os.path.basename(filename)
+    for face in faces:
+        faceAligned = fa.align(img, gray, face)
+        faces=detector(cv2.cvtColor(faceAligned,cv2.COLOR_BGR2GRAY))
+        for face in faces:
+            size_h,size_w=faceAligned.shape[:2]
+            (x, y, w, h) = rect_to_bb(face)
+            x1 = max(x,0) 
+            x2 = min(x+w,size_w)
+            y1 = max(y,0)
+            y2 = min(y+h,size_h)
+            faceAligned=faceAligned[y:y+h,x:x+w]
+            print(x,y,w,h)
+            cv2.imwrite(f'new/{name}',faceAligned)
+            return faceAligned
+    return None
+
+
+def get_images_and_labels(data_dir,detector_path='haarcascade_frontalface_default.xml',label_path='labels.pkl',sep='.'):
+    detector = cv2.CascadeClassifier(detector_path)
+    x_train = []
+    currect_id = 0
+    label_ids = {}
+    y_labels = []
+    image_paths=[os.path.join(data_dir, f) for f in os.listdir(data_dir)]
+    for _, image_path in enumerate(image_paths):
+        name = os.path.basename(image_path).split(sep)[0]
         try:
-            img_feature = self.get_feature([img])[0]['feature']
-
-            # print(cosine_similarity_scores)
-            # print('min',np.min(cosine_similarity_scores),'max',np.max(cosine_similarity_scores))
-            min_dist=100
-            filename=''
-            for (person_name, person_feature) in zip(people_name, people_feature):
-                # dist = np.linalg.norm(person_feature.reshape(-1,1) - img_feature.reshape(-1,1),ord=2)
-                dist=distance.euclidean(person_feature, img_feature)
-                print(person_name,dist)
-                if dist < min_dist:
-                    min_dist=dist
-                    filename=person_name
-                if  dist <self.threshold :
-                    compelte.append({'photoID': person_name, 'confidence': dist})
-                # compelte.append({'photoID': person_name, 'confidence': dist})
+            if name not in label_ids:
+                label_ids[name] = currect_id
+                currect_id += 1
+            # img=cv2.imread(image_path)
+            # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            img=face_align(image_path)
+            if img is not None:
+                gray=cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+                x_train.append(gray)
+            # img = Image.open(image_path).convert('L')
+            # gray = np.array(img,dtype=np.uint8)
+            # faces = detector.detectMultiScale(gray)
+            # for (x, y, w, h) in faces:
+            #     data=gray[y:y + h, x:x + w]
+            #     data=cv2.resize(data,(128,128))
+            #     x_train.append(data)
+                y_labels.append(label_ids[name])
         except Exception as e:
-            print('compare img is not face')
-            return []
-        print('min_dist',filename,min_dist)
-        return compelte
+            print(image_path,e)
+    dump_label_ids(label_ids,label_path)
+    return x_train, y_labels
+
+def dump_label_ids(label_ids,filename):
+    with open(filename,'wb') as f:
+        pickle.dump(label_ids,f)
+
+def load_label_ids(filename):
+    label_ids={}
+    with open(filename,'rb') as f:
+        label_ids=pickle.load(f)
+        labels={v:k for k,v in label_ids.items()}
+    return labels
 
 
-def test_time():
-    facerecognition.compare_similarity(people_data,filelist[-1])
+def train_LBPHFaceRecognizer(data_dir,detecor_path='haarcascade_frontalface_default.xml', 
+    model_path='lbph_model.yml', label_path='labels.pkl', data_sep='.'):
+    '''
+    params:
+        detector_path \n
+        mdoel_path \n
+        label_path \n
 
-if __name__ == "__main__":
-    from glob import glob
-    from random import shuffle
-    from time import time
-    model_dir = 'model'
-    facerecognition = FaceRecognition(model_dir, 0.7)
-    filelist=glob('test_data/face_data/*')#face_data/*')
-    shuffle(filelist)
-    people_data = facerecognition.get_feature(filelist[:500])# get people feature
-    print('comparefile','test_data/101.png')
-    print(people_data[0]['feature'].shape)
-    st=time()
-    # facerecognition.compare_similarity(people_data, 'test_data/e1.png')
-    print(facerecognition.compare_similarity(people_data,  'test_data/101.png')) # similarity
-    et=time()
-    print('cost:',f'{et-st:0.8f} s')
+    -- info
+        data_dir is train data dir \n
+        detector_path is opencv face detector model \n
+        model_dir is lbph model save path \n 
+        label_path is data label dump path \n
+        data_sep is train data img file group, split filneane. ex: aaa.jpg - > aaa
+    '''
+    recognizer = cv2.face.LBPHFaceRecognizer_create()
+    faces, Ids = get_images_and_labels(data_dir,detecor_path,label_path,data_sep)
+    recognizer.train(faces, np.array(Ids))
+    recognizer.save(model_path)
 
-    # from timeit import timeit
-    # print()
-    # number=100000
-    # t=timeit('test_time','from __main__ import test_time',number=number)
-    # print('average_cost:',t/number)
+
+
+class FaceRecongition():
+    '''
+    params:
+
+        mdoel_path \n
+        label_path \n
+        detector_path \n
+
+    -- info
+        mdoel_path is lbhp model path \n
+        label_path is record classifier label path \n
+        detecor_path is opencv face dete \n
+
+    -- using \n
+        facerecognition=FaceRecongition(model_path, label_path) \n
+        print(facerecogition(test_img_path)) \n
+ 
+
+        if model retrain call  reload method\n
+            facerecogition.reload()
+    
+    
+    '''
+    def __init__(self,model_path='lbph_model.yml',label_path='labels.pkl',detector_path='haarcascade_frontalface_default.xml'):
+        self.detector = cv2.CascadeClassifier(detector_path)
+        self.recognizer = cv2.face.LBPHFaceRecognizer_create()
+        self.recognizer.read(model_path)
+        self.labels = load_label_ids(label_path)
+        self.model_path = model_path
+        self.label_path = label_path
+    def reload(self):
+        self.labels = load_label_ids(self.label_path)
+        self.recognizer.read(self.model_path)
+    def __call__(self,img_path):
+        img=cv2.imread(img_path)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        faces = self.detector.detectMultiScale(gray, 1.1, 3)
+        for (x, y, w, h) in faces:
+            data = gray[y:y + h, x:x + w]
+            data = cv2.resize(data,(128,128))
+            id, conf = self.recognizer.predict(gray[y:y + h, x:x + w])
+            # if 30 < conf < 85:
+            return {'photoID': self.labels[id], 'confidence': conf}
+            # return {'photoID':'Unknow','confidence':0}
+        return {'error_message':'not face'}
+
+if __name__ == '__main__':
+    import argparse
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--train_data_dir',default='face_data')
+    parser.add_argument('--model_path',default='lbph_model.yml')
+    parser.add_argument('--label_path',default='labels.pkl')
+    parser.add_argument('--detector_path',default='haarcascade_frontalface_default.xml')
+
+    parser.add_argument('--test_img_path',default='test_data/a2.png')
+    args=parser.parse_args()
+
+    train_data_dir=args.train_data_dir
+    test_img_path =args.test_img_path
+    model_path = args.model_path
+    label_path = args.label_path
+    detector_path=args.detector_path
+    print(train_data_dir,test_img_path,model_path,detector_path)
+    
+    train_LBPHFaceRecognizer(train_data_dir,detector_path)
+    # facerecogition = FaceRecongition(model_path, label_path,detector_path)
+
+    # from glob import glob
+    # for item in glob('test_data/*'):
+    #     face_align(item)
+
+    # #retrain
+
+
+    # train_LBPHFaceRecognizer(train_data_dir,detector_path)
+    # facerecogition.reload()
+    # print(facerecogition(test_img_path))
