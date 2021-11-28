@@ -5,12 +5,12 @@ from PIL import Image
 import pickle
 
 import dlib
-from face_align import FaceAligner
+from tool.face_align import FaceAligner
 from imutils.face_utils import rect_to_bb
 import imutils
  
 detector = dlib.get_frontal_face_detector()
-predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
+predictor = dlib.shape_predictor("model/shape_predictor_68_face_landmarks_GTX.dat")
 fa = FaceAligner(predictor, desiredFaceWidth=256)
 
 
@@ -21,10 +21,12 @@ def face_align(filename):
     img = cv2.imread(filename)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = detector(gray, 1)
-    name=os.path.basename(filename)
+    name = os.path.basename(filename)
     for face in faces:
         faceAligned = fa.align(img, gray, face)
+        cv2.imwrite(f'crop/{name}',faceAligned)
         faces=detector(cv2.cvtColor(faceAligned,cv2.COLOR_BGR2GRAY))
+        # return faceAligned
         for face in faces:
             size_h,size_w=faceAligned.shape[:2]
             (x, y, w, h) = rect_to_bb(face)
@@ -32,14 +34,14 @@ def face_align(filename):
             x2 = min(x+w,size_w)
             y1 = max(y,0)
             y2 = min(y+h,size_h)
-            faceAligned=faceAligned[y:y+h,x:x+w]
-            print(x,y,w,h)
+            faceAligned=faceAligned[y1:y2,x1:x2]
+            faceAligned=cv2.resize(faceAligned,(128,128))
             cv2.imwrite(f'new/{name}',faceAligned)
             return faceAligned
     return None
 
 
-def get_images_and_labels(data_dir,detector_path='haarcascade_frontalface_default.xml',label_path='labels.pkl',sep='.'):
+def get_images_and_labels(data_dir,detector_path='model/haarcascade_frontalface_default.xml',label_path='labels.pkl',sep='.'):
     detector = cv2.CascadeClassifier(detector_path)
     x_train = []
     currect_id = 0
@@ -139,14 +141,17 @@ class FaceRecongition():
         self.labels = load_label_ids(self.label_path)
         self.recognizer.read(self.model_path)
     def __call__(self,img_path):
-        img=cv2.imread(img_path)
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        faces = self.detector.detectMultiScale(gray, 1.1, 3)
-        for (x, y, w, h) in faces:
-            data = gray[y:y + h, x:x + w]
-            data = cv2.resize(data,(128,128))
-            id, conf = self.recognizer.predict(gray[y:y + h, x:x + w])
-            # if 30 < conf < 85:
+        img=face_align(img_path)
+        if img is not None:
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        # img=cv2.imread(img_path)
+        # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        # faces = self.detector.detectMultiScale(gray, 1.1, 3)
+        # for (x, y, w, h) in faces:
+        #     data = gray[y:y + h, x:x + w]
+        #     data = cv2.resize(data,(128,128))
+            id, conf = self.recognizer.predict(gray)
+        # if 30 < conf < 85:
             return {'photoID': self.labels[id], 'confidence': conf}
             # return {'photoID':'Unknow','confidence':0}
         return {'error_message':'not face'}
@@ -167,14 +172,14 @@ if __name__ == '__main__':
     model_path = args.model_path
     label_path = args.label_path
     detector_path=args.detector_path
-    print(train_data_dir,test_img_path,model_path,detector_path)
-    
+    print('args ',train_data_dir,test_img_path,model_path,detector_path)
+    print()
     train_LBPHFaceRecognizer(train_data_dir,detector_path)
-    # facerecogition = FaceRecongition(model_path, label_path,detector_path)
+    facerecogition = FaceRecongition(model_path, label_path,detector_path)
 
-    # from glob import glob
-    # for item in glob('test_data/*'):
-    #     face_align(item)
+    from glob import glob
+    for item in glob('test_data/*'):
+        print(item,facerecogition(item))
 
     # #retrain
 
