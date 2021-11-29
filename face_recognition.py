@@ -164,7 +164,7 @@ if __name__ == '__main__':
     parser.add_argument('--label_path',default='labels.pkl')
     parser.add_argument('--detector_path',default='haarcascade_frontalface_default.xml')
 
-    parser.add_argument('--test_img_path',default='test_data/a2.png')
+    parser.add_argument('--test_img_path',default='test_data/val_iimg/a_2.png')
     args=parser.parse_args()
 
     train_data_dir=args.train_data_dir
@@ -178,9 +178,15 @@ if __name__ == '__main__':
     facerecogition = FaceRecongition(model_path, label_path,detector_path)
 
     from glob import glob
-    for item in glob('test_data/*'):
-        print(item,facerecogition(item))
+    imgs=glob('test_data/val_img/*')
+    imgs.sort()
 
+    from time import time
+    for item in imgs:
+        st=time()
+        print(item,facerecogition(item))
+        et=time()
+        print(f'{et-st:0.5f}s')
     # #retrain
 
 
