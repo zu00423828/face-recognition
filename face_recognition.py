@@ -136,7 +136,7 @@ class FaceRecognition():
             for (person_name, person_feature) in zip(people_name, people_feature):
                 # dist = np.linalg.norm(person_feature.reshape(-1,1) - img_feature.reshape(-1,1),ord=2)
                 dist=distance.euclidean(person_feature, img_feature)
-                print(person_name,dist)
+                # print(person_name,dist)
                 if dist < min_dist:
                     min_dist=dist
                     filename=person_name
@@ -147,7 +147,7 @@ class FaceRecognition():
             print('compare img is not face')
             return []
         print('min_dist',filename,min_dist)
-        return compelte
+        return img,compelte
 
 
 def test_time():
@@ -159,16 +159,22 @@ if __name__ == "__main__":
     from time import time
     model_dir = 'model'
     facerecognition = FaceRecognition(model_dir, 0.7)
-    filelist=glob('test_data/face_data/*')#face_data/*')
+    filelist=glob('face_data/*')#face_data/*')
     shuffle(filelist)
     people_data = facerecognition.get_feature(filelist[:500])# get people feature
     print('comparefile','test_data/101.png')
-    print(people_data[0]['feature'].shape)
-    st=time()
+
+    from glob import glob
+
     # facerecognition.compare_similarity(people_data, 'test_data/e1.png')
-    print(facerecognition.compare_similarity(people_data,  'test_data/101.png')) # similarity
-    et=time()
-    print('cost:',f'{et-st:0.8f} s')
+    img_list=glob('test_data/val_img/*')
+    img_list.sort()
+    for img in img_list:
+        print('check')
+        st=time()
+        print(facerecognition.compare_similarity(people_data,  img)) # similarity
+        et=time()
+        print('cost:',f'{et-st:0.8f} s')
 
     # from timeit import timeit
     # print()
