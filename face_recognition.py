@@ -1,7 +1,6 @@
 import os
 import dlib
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"   #disable gpu
-from keras import backend as K
 import time
 import cv2
 import os
@@ -10,8 +9,11 @@ import numpy as np
 import pandas as pd
 from scipy.spatial import distance
 from keras.models import load_model
-from imutils.face_utils import rect_to_bb
-from tool.face_align import FaceAligner
+
+if __name__== '__main__':
+    from tool.face_align import FaceAligner
+else:
+    from .tool.face_align import FaceAligner
 image_size = 160
 detector=None
 fa=None
@@ -81,7 +83,7 @@ class FaceRecognition():
     threshold 是信心閥值 愈低愈好 預設為0.7 \n
     sep 是取得feature的檔案分割符號 用於做 label
     '''
-    def __init__(self, model_dir, threshold,sep='.'):
+    def __init__(self, model_dir='model', threshold=0.7,sep='.'):
         self.threshold = threshold
         self.sep=sep
         if detector is None:
@@ -104,7 +106,7 @@ class FaceRecognition():
                 print(item,e)
         # print(feature_list)
         return feature_list
-    def compare_similarity(self, people_data, img):
+    def compare_similarity(self, people_data, img_path):
         '''
             people feature and new_img make similarity
         '''
@@ -113,7 +115,7 @@ class FaceRecognition():
         people_feature = np.array(df['feature'].tolist())
         compelte = []
         try:
-            img_feature = self.get_feature([img])[0]['feature']
+            img_feature = self.get_feature([img_path])[0]['feature']
 
             # print(cosine_similarity_scores)
             # print('min',np.min(cosine_similarity_scores),'max',np.max(cosine_similarity_scores))
