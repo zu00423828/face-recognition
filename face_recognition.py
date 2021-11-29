@@ -11,17 +11,20 @@ import numpy as np
 import pandas as pd
 from scipy.spatial import distance
 from keras.models import load_model
-from tool.MobileFace_Detection.mobileface_detector import MobileFaceDetection
 from imutils.face_utils import rect_to_bb
 from tool.face_align import FaceAligner
 image_size = 160
-bboxes_predictor = None
+detector=None
+fa=None
 feature_extractor = None
 def load_pretrain_model(model_dir):
-    global bboxes_predictor
+    global detector
     global feature_extractor
-    bboxes_predictor = MobileFaceDetection(f'{model_dir}/mobilefacedet_v1_gluoncv.params', '')
-
+    global fa
+    # bboxes_predictor = MobileFaceDetection(f'{model_dir}/mobilefacedet_v1_gluoncv.params', '')
+    detector = dlib.get_frontal_face_detector()
+    predictor = dlib.shape_predictor( f'{model_dir}/shape_predictor_5_face_landmarks.dat')
+    fa=FaceAligner(predictor)
     feature_extractor = load_model(f'{model_dir}/facenet_keras.h5')
 def l2_normalize(x, axis=-1, epsilon=1e-10):
 
@@ -43,10 +46,9 @@ def prewhiten(x):
     return y
 
 
-detector = dlib.get_frontal_face_detector()
-# 人臉關鍵點模型
-predictor = dlib.shape_predictor( 'model/shape_predictor_68_face_landmarks.dat')
-fa=FaceAligner(predictor)
+
+
+
 def face_align(filename):
     img = cv2.imread(filename)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -103,7 +105,7 @@ def align_image(img):
 class FaceRecognition():
     def __init__(self, model_dir, threshold):
         self.threshold = threshold
-        if bboxes_predictor is None:
+        if detector is None:
             load_pretrain_model(model_dir)
     def get_feature(self, img_paths):  
         '''
