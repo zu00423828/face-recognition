@@ -18,6 +18,11 @@ detector=None
 fa=None
 feature_extractor = None
 def load_pretrain_model(model_dir):
+    '''
+    load 預訓練的模型 
+    包含   dlib 的 hog 模型
+    keras facemet 用於萃取特徵
+    '''
     global detector
     global feature_extractor
     global fa
@@ -31,6 +36,10 @@ def l2_normalize(x, axis=-1, epsilon=1e-10):
     output = x / np.sqrt(np.maximum(np.sum(np.square(x), axis=axis, keepdims=True), epsilon))
     return output
 def prewhiten(x):
+    '''
+    圖片白化
+    解決過曝 或低曝圖片
+    '''
     if x.ndim == 4:
         axis = (1, 2, 3)
         size = x[0].size
@@ -45,11 +54,12 @@ def prewhiten(x):
     y = (x - mean) / std_adj
     return y
 
-
-
-
-
 def face_align(filename):
+    '''
+    人臉校正
+    校正成眼睛水平
+    resize成160*160
+    '''
     img = cv2.imread(filename)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = detector(gray, 1)
@@ -63,46 +73,14 @@ def face_align(filename):
     img=cv2.resize(img,(160,160))
     img=cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
     return img
-def align_image(img):
-    bboxes = bboxes_predictor.mobileface_detector('', img)
-    if bboxes == None or len(bboxes) < 1:
-        raise Exception('not face')       
-    for bbox in bboxes:
-        xmin, ymin, xmax, ymax, _, _ = bbox
-        size_scale = 1
-        center_scale = 0.1
-        center_shift = (ymax - ymin) * center_scale
-        w_new = (ymax - ymin) * size_scale
-        h_new = (ymax - ymin) * size_scale
-        x_center = xmin + (xmax - xmin) / 2
-        y_center = ymin + (ymax - ymin) / 2 + center_shift
-        x_min = int(x_center - w_new / 2)
-        y_min = int(y_center - h_new / 2)
-        x_max = int(x_center + w_new / 2)
-        y_max = int(y_center + h_new / 2)
-        ymin=max(0,y_min)
-        y_max=min(ymax,img.shape[0])
-        x_min=max(0,x_min)
-        y_max=min(ymax,img.shape[0])
-        x_max=min(x_max,img.shape[1])
-        face=img[y_min:y_max,x_min:x_max]
-        aligned=cv2.resize(face,(160,160))
-        return aligned
-            
-    # cascade = cv2.CascadeClassifier(cascade_path)
-    # faces = cascade.detectMultiScale(img, scaleFactor=1.1, minNeighbors=3)
-    # if(len(faces)>0):
-    #     (x, y, w, h) = faces[0]
-    #     face = img[y:y+h, x:x+w]
-    #     faceMargin = np.zeros((h+margin*2, w+margin*2, 3), dtype = np.uint8)
-    #     faceMargin[margin:margin+h, margin:margin+w] = face
-    #     aligned = cv2.resize(faceMargin, (image_size, image_size))
-    #     return aligned
-    # else:
-    #     print('is not face')
-    #     return None
-
 class FaceRecognition():
+    '''
+    參數
+    model_dir
+    threshold
+    說明
+    
+    '''
     def __init__(self, model_dir, threshold):
         self.threshold = threshold
         if detector is None:
@@ -123,26 +101,10 @@ class FaceRecognition():
                 white_img= white_img[np.newaxis,:]
                 feature = l2_normalize(np.concatenate(feature_extractor.predict(white_img)))
                 feature_list.append({'filename': item, 'feature': feature})
-            #     img=cv2.imread(item)
-            #     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            #     faces = self.face_cascade.detectMultiScale(gray, 1.3, 5)
-            #     for (x, y, w, h) in faces:
-            #         x1 = x-PADDING
-            #         y1 = y-PADDING
-            #         x2 = x+w+PADDING
-            #         y2 = y+h+PADDING
-            #         img = cv2.rectangle(img,(x1, y1),(x2, y2),(255,0,0),2)
-            #         feature = img_path_to_encoding(item, self.FRmodel)
-
-            #     feature_list.append({'filename': item, 'feature': feature})
             except Exception as  e:
                 print(item,e,(img.shape,white_img.shape,feature.shape),item)
         # print(feature_list)
         return feature_list
-
-
-
-
     def compare_similarity(self, people_data, img):
         '''
             people feature and new_img make similarity
@@ -174,9 +136,6 @@ class FaceRecognition():
         print('min_dist',filename,min_dist)
         return img,compelte
 
-
-def test_time():
-    facerecognition.compare_similarity(people_data,filelist[-1])
 
 if __name__ == "__main__":
     from glob import glob
