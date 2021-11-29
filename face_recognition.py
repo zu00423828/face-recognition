@@ -26,7 +26,6 @@ def load_pretrain_model(model_dir):
 def l2_normalize(x, axis=-1, epsilon=1e-10):
 
     output = x / np.sqrt(np.maximum(np.sum(np.square(x), axis=axis, keepdims=True), epsilon))
-
     return output
 def prewhiten(x):
     if x.ndim == 4:
@@ -59,7 +58,7 @@ def face_align(filename):
         faceAligned=cv2.cvtColor(faceAligned,cv2.COLOR_BGR2RGB)
         faceAligned=cv2.resize(faceAligned,(160,160))
         return faceAligned
-    img=img.resize(img,(160,160))
+    img=cv2.resize(img,(160,160))
     img=cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
     return img
 def align_image(img):
