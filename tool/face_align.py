@@ -11,6 +11,11 @@ FACIAL_LANDMARKS_68_IDXS = OrderedDict([
 	("nose", (27, 36)),
 	("jaw", (0, 17))
 ])
+FACIAL_LANDMARKS_5_IDXS = OrderedDict([
+	("right_eye", (2, 3)),
+	("left_eye", (0, 1)),
+	("nose", (4))
+])
 def shape_to_np(shape, dtype="int"):
 	# initialize the list of (x, y)-coordinates
 	coords = np.zeros((shape.num_parts, 2), dtype=dtype)
@@ -44,7 +49,9 @@ class FaceAligner:
 			# extract the left and right eye (x, y)-coordinates
 			(lStart, lEnd) = FACIAL_LANDMARKS_68_IDXS["left_eye"]
 			(rStart, rEnd) = FACIAL_LANDMARKS_68_IDXS["right_eye"]
-			
+		else:
+			(lStart, lEnd) = FACIAL_LANDMARKS_5_IDXS["left_eye"]
+			(rStart, rEnd) = FACIAL_LANDMARKS_5_IDXS["right_eye"]
 		leftEyePts = shape[lStart:lEnd]
 		rightEyePts = shape[rStart:rEnd]
 
