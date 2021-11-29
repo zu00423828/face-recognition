@@ -1,4 +1,5 @@
 import os
+import dlib
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"   #disable gpu
 from keras import backend as K
 import time
@@ -11,6 +12,8 @@ import pandas as pd
 from scipy.spatial import distance
 from keras.models import load_model
 from tool.MobileFace_Detection.mobileface_detector import MobileFaceDetection
+from imutils.face_utils import rect_to_bb
+from tool.face_align import FaceAligner
 image_size = 160
 bboxes_predictor = None
 feature_extractor = None
@@ -39,6 +42,26 @@ def prewhiten(x):
     std_adj = np.maximum(std, 1.0/np.sqrt(size))
     y = (x - mean) / std_adj
     return y
+
+
+detector = dlib.get_frontal_face_detector()
+# 人臉關鍵點模型
+predictor = dlib.shape_predictor( 'model/shape_predictor_68_face_landmarks.dat')
+fa=FaceAligner(predictor)
+def face_align(filename):
+    img = cv2.imread(filename)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    faces = detector(gray, 1)
+    name = os.path.basename(filename)
+    for face in faces:
+        faceAligned = fa.align(img, gray, face)
+        cv2.imwrite(f'crop/{name}',faceAligned)
+        faceAligned=cv2.cvtColor(faceAligned,cv2.COLOR_BGR2RGB)
+        faceAligned=cv2.resize(faceAligned,(160,160))
+        return faceAligned
+    img=img.resize(img,(160,160))
+    img=cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
+    return img
 def align_image(img):
     bboxes = bboxes_predictor.mobileface_detector('', img)
     if bboxes == None or len(bboxes) < 1:
@@ -90,10 +113,11 @@ class FaceRecognition():
         from tqdm import tqdm
         feature_list = []
         for item in tqdm(img_paths):
-            img=cv2.imread(item)
+            # img=cv2.imread(item)
             # img=cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
             try:
-                img=align_image(img)
+                # img=align_image(img)
+                img=face_align(item)
                 white_img=prewhiten(img)
                 white_img= white_img[np.newaxis,:]
                 feature = l2_normalize(np.concatenate(feature_extractor.predict(white_img)))
@@ -111,7 +135,7 @@ class FaceRecognition():
 
             #     feature_list.append({'filename': item, 'feature': feature})
             except Exception as  e:
-                print(item,e)
+                print(item,e,(img.shape,white_img.shape,feature.shape),item)
         # print(feature_list)
         return feature_list
 
@@ -170,11 +194,11 @@ if __name__ == "__main__":
     img_list=glob('test_data/val_img/*')
     img_list.sort()
     for img in img_list:
-        print('check')
         st=time()
         print(facerecognition.compare_similarity(people_data,  img)) # similarity
         et=time()
         print('cost:',f'{et-st:0.8f} s')
+        print()
 
     # from timeit import timeit
     # print()
