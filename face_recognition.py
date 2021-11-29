@@ -3,7 +3,6 @@ import dlib
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"   #disable gpu
 from keras import backend as K
 import time
-K.set_image_data_format('channels_first')
 import cv2
 import os
 import glob
@@ -63,10 +62,8 @@ def face_align(filename):
     img = cv2.imread(filename)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = detector(gray, 1)
-    name = os.path.basename(filename)
     for face in faces:
         faceAligned = fa.align(img, gray, face)
-        cv2.imwrite(f'crop/{name}',faceAligned)
         faceAligned=cv2.cvtColor(faceAligned,cv2.COLOR_BGR2RGB)
         faceAligned=cv2.resize(faceAligned,(160,160))
         return faceAligned
@@ -76,13 +73,17 @@ def face_align(filename):
 class FaceRecognition():
     '''
     參數
-    model_dir
-    threshold
-    說明
-    
+    model_dir \n
+    threshold \n
+    sep \n
+    說明 \n
+    model_dir 是放需要的模型資料夾\n
+    threshold 是信心閥值 愈低愈好 預設為0.7 \n
+    sep 是取得feature的檔案分割符號 用於做 label
     '''
-    def __init__(self, model_dir, threshold):
+    def __init__(self, model_dir, threshold,sep='.'):
         self.threshold = threshold
+        self.sep=sep
         if detector is None:
             load_pretrain_model(model_dir)
     def get_feature(self, img_paths):  
@@ -92,17 +93,15 @@ class FaceRecognition():
         from tqdm import tqdm
         feature_list = []
         for item in tqdm(img_paths):
-            # img=cv2.imread(item)
-            # img=cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
             try:
-                # img=align_image(img)
+                name=os.path.basename(item).split(self.sep)[0]
                 img=face_align(item)
                 white_img=prewhiten(img)
                 white_img= white_img[np.newaxis,:]
                 feature = l2_normalize(np.concatenate(feature_extractor.predict(white_img)))
-                feature_list.append({'filename': item, 'feature': feature})
+                feature_list.append({'label': name, 'feature': feature})
             except Exception as  e:
-                print(item,e,(img.shape,white_img.shape,feature.shape),item)
+                print(item,e)
         # print(feature_list)
         return feature_list
     def compare_similarity(self, people_data, img):
@@ -110,7 +109,7 @@ class FaceRecognition():
             people feature and new_img make similarity
         '''
         df = pd.DataFrame(people_data)
-        people_name = df['filename'].tolist()
+        people_name = df['label'].tolist()
         people_feature = np.array(df['feature'].tolist())
         compelte = []
         try:
@@ -142,19 +141,24 @@ if __name__ == "__main__":
     from random import shuffle
     from time import time
     model_dir = 'model'
-    facerecognition = FaceRecognition(model_dir, 0.7)
+    facerecognition = FaceRecognition(model_dir = model_dir, threshold = 0.7, sep = '.')
     filelist=glob('face_data/*')#face_data/*')
     shuffle(filelist)
+
+
+    #取得 feature 和 label
     people_data = facerecognition.get_feature(filelist[:500])# get people feature
-    print('comparefile','test_data/101.png')
+
+
 
     from glob import glob
 
     # facerecognition.compare_similarity(people_data, 'test_data/e1.png')
-    img_list=glob('test_data/val_img/*')
+    img_list=glob('test_data/*')
     img_list.sort()
     for img in img_list:
         st=time()
+        #取得 辨識結果
         print(facerecognition.compare_similarity(people_data,  img)) # similarity
         et=time()
         print('cost:',f'{et-st:0.8f} s')
