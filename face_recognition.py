@@ -135,7 +135,7 @@ class FaceRecognition():
             print('compare img is not face')
             return []
         print('min_dist',filename,min_dist)
-        return img,compelte
+        return compelte
 
 
 if __name__ == "__main__":
