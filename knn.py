@@ -10,7 +10,7 @@ from keras.models import load_model
 import cv2
 import dlib
 from tool.face_align import FaceAligner
-import pandas as pd
+
 
 
 detector = None
@@ -80,7 +80,7 @@ def face_align(filename):
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     return img
 
-def fae_feature(img_path):
+def face_feature(img_path):
     img=face_align(img_path)
     white_img=prewhiten(img)
     white_img= white_img[np.newaxis,:]
@@ -89,15 +89,14 @@ def fae_feature(img_path):
 
 def knn_classifier(input, knn_path):
     knn = joblib.load(knn_path)
-    data=get_features_and_labels(input)
+    x=face_feature(input)
+    x=x.reshape(1,-1)
     labels=load_label_ids('labels.pkl')
-    print(labels)
-    x=data['feature']
     prob = knn.predict_proba(x)
     pred = knn.predict(x)
-    print(pred)
+    print('pred',pred)
     print(labels[pred[0]])
-    # print(max(distance[0][0]),pred)
+    print(prob[0][pred])
     return pred, prob
 
 
@@ -122,7 +121,7 @@ def get_features_and_labels(image_paths, label_path='labels.pkl', sep='.'):
         if name not in label_ids:
             label_ids[name] = currect_id
             currect_id += 1
-        feature= fae_feature(image_path)
+        feature= face_feature(image_path)
         x_train.append(feature)
         y_labels.append(label_ids[name])
         # except Exception as e:
@@ -134,7 +133,9 @@ def get_features_and_labels(image_paths, label_path='labels.pkl', sep='.'):
 
 
 def dump_label_ids(label_ids, filename):
-    print(label_ids)
+    if os.path.exists(filename):
+        print('remove labels.pkl')
+        os.remove(filename)
     with open(filename, 'wb') as f:
         pickle.dump(label_ids, f)
 
@@ -145,7 +146,7 @@ def load_label_ids(filename):
     with open(filename, 'rb') as f:
         label_ids = pickle.load(f)
         # print(label_ids.keys())
-        # label_ids = {v: k for k, v in label_ids.items()}
+        label_ids = {v: k for k, v in label_ids.items()}
     return label_ids
 
 
@@ -173,6 +174,6 @@ if __name__ == '__main__':
 
     image_paths=glob(f'{train_data_dir}/*')
     people_data = get_features_and_labels(image_paths, label_path)
-    # training_KNN(people_data)
-    knn_classifier([test_img_path],'model/knn.model')
+    training_KNN(people_data)
+    knn_classifier(test_img_path,'model/knn.model')
 
