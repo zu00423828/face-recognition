@@ -83,9 +83,11 @@ class FaceRecognition():
     threshold 是信心閥值 愈低愈好 預設為0.7 \n
     sep 是取得feature的檔案分割符號 用於做 label
     '''
-    def __init__(self, model_dir='model', threshold=0.7,sep='.'):
+    def __init__(self, model_dir=None, threshold=0.7,sep='.'):
         self.threshold = threshold
         self.sep=sep
+        if model_dir is None:
+            model_dir= f"{os.path.dirname(os.path.realpath('__file__'))}/model"
         if detector is None:
             load_pretrain_model(model_dir)
     def get_feature(self, img_paths):  
@@ -143,7 +145,7 @@ if __name__ == "__main__":
     from random import shuffle
     from time import time
     model_dir = 'model'
-    facerecognition = FaceRecognition(model_dir = model_dir, threshold = 0.7, sep = '.')
+    facerecognition = FaceRecognition(model_dir = None, threshold = 0.7, sep = '.')
     filelist=glob('face_data/*')#face_data/*')
     shuffle(filelist)
 
