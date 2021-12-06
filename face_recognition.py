@@ -87,7 +87,7 @@ class FaceRecognition():
         self.threshold = threshold
         self.sep=sep
         if model_dir is None:
-            model_dir= f"{os.path.dirname(os.path.realpath('__file__'))}/model"
+            model_dir= f"{os.path.split(os.path.realpath('__file__'))[0]}/model"
         if detector is None:
             load_pretrain_model(model_dir)
     def get_feature(self, img_paths):  
