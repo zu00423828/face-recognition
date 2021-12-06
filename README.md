@@ -7,7 +7,7 @@ from face_recognition import  FaceRecognition
 ```
 facerecognition = FaceRecognition(model_dir, threshold, sep)
 ```
-model_dir預設為model
+model_dir預設為None ，model_dir 用來讀取尋找人臉跟萃取特徵的模型資料夾， 可以依照自己的model_dir在哪 給參數 ，如果是None會讀 此專案的model資料夾
 threshold預設為0.5 是信心值門檻
 sep用於做label的切割符號
 # Extract Feature
