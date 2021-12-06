@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from scipy.spatial import distance
 from keras.models import load_model
-
+import json
 if __name__== '__main__':
     from tool.face_align import FaceAligner
 else:
@@ -135,9 +135,9 @@ class FaceRecognition():
                 # compelte.append({'photoID': person_name, 'confidence': dist})
         except Exception as e:
             print('compare img is not face')
-            return []
+            return json.dumps([])
         print('min_dist',filename,min_dist)
-        return compelte
+        return json.dumps(compelte)
 
 
 if __name__ == "__main__":
