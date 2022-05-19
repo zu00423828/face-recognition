@@ -10,6 +10,7 @@ import pandas as pd
 from scipy.spatial import distance
 from keras.models import load_model
 import json
+import tensorflow as tf
 if __name__== '__main__':
     from tool.face_align import FaceAligner
 else:
@@ -18,6 +19,7 @@ image_size = 160
 detector=None
 fa=None
 feature_extractor = None
+grpah = None
 def load_pretrain_model(model_dir):
     '''
     load 預訓練的模型 
@@ -27,11 +29,13 @@ def load_pretrain_model(model_dir):
     global detector
     global feature_extractor
     global fa
+    global grpah
     # bboxes_predictor = MobileFaceDetection(f'{model_dir}/mobilefacedet_v1_gluoncv.params', '')
     detector = dlib.get_frontal_face_detector()
     predictor = dlib.shape_predictor( f'{model_dir}/shape_predictor_5_face_landmarks.dat')
     fa=FaceAligner(predictor)
     feature_extractor = load_model(f'{model_dir}/facenet_keras.h5')
+    graph =tf.get_default_graph()
 def l2_normalize(x, axis=-1, epsilon=1e-10):
 
     output = x / np.sqrt(np.maximum(np.sum(np.square(x), axis=axis, keepdims=True), epsilon))
@@ -102,8 +106,9 @@ class FaceRecognition():
                 img=face_align(item)
                 white_img=prewhiten(img)
                 white_img= white_img[np.newaxis,:]
-                feature = l2_normalize(np.concatenate(feature_extractor.predict(white_img)))
-                feature_list.append({'label': name, 'feature': feature})
+                with grpah.as_default():
+                    feature = l2_normalize(np.concatenate(feature_extractor.predict(white_img)))
+                    feature_list.append({'label': name, 'feature': feature})
             except Exception as  e:
                 print(item,e)
         # print(feature_list)
