@@ -29,7 +29,7 @@ def load_pretrain_model(model_dir):
     global detector
     global feature_extractor
     global fa
-    global grpah
+    global graph
     # bboxes_predictor = MobileFaceDetection(f'{model_dir}/mobilefacedet_v1_gluoncv.params', '')
     detector = dlib.get_frontal_face_detector()
     predictor = dlib.shape_predictor( f'{model_dir}/shape_predictor_5_face_landmarks.dat')
@@ -106,7 +106,7 @@ class FaceRecognition():
                 img=face_align(item)
                 white_img=prewhiten(img)
                 white_img= white_img[np.newaxis,:]
-                with grpah.as_default():
+                with graph.as_default():
                     feature = l2_normalize(np.concatenate(feature_extractor.predict(white_img)))
                     feature_list.append({'label': name, 'feature': feature})
             except Exception as  e:
