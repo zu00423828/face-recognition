@@ -153,9 +153,9 @@ class FaceRecognition():
                 # compelte.append({'photoID': person_name, 'confidence': dist})
         except Exception as e:
             print('compare img is not face')
-            return json.dumps([])
+            return []
         print('min_dist', filename, min_dist)
-        return json.dumps(compelte)
+        return compelte
 
 
 if __name__ == "__main__":
