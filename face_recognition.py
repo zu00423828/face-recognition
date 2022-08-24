@@ -107,7 +107,7 @@ class FaceRecognition():
 
     def get_feature(self, img_paths):
         '''
-            get 128 face vetor
+            get 128 face vector
         '''
         from tqdm import tqdm
         feature_list = []
