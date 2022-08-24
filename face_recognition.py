@@ -1,6 +1,8 @@
-import tensorflow as tf
-import json
-from keras.models import load_model
+import dlib
+# import tensorflow as tf
+from functools import partial
+# from keras.models import load_model
+import onnxruntime
 from scipy.spatial import distance
 import pandas as pd
 import numpy as np
@@ -8,8 +10,7 @@ import glob
 import cv2
 import time
 import os
-import dlib
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # disable gpu
+# os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # disable gpu
 if __name__ == '__main__':
     from tool.face_align import FaceAligner
 else:
@@ -18,7 +19,6 @@ image_size = 160
 detector = None
 fa = None
 feature_extractor = None
-graph = tf.get_default_graph()
 
 
 def load_pretrain_model(model_dir):
@@ -35,7 +35,8 @@ def load_pretrain_model(model_dir):
     predictor = dlib.shape_predictor(
         f'{model_dir}/shape_predictor_5_face_landmarks.dat')
     fa = FaceAligner(predictor)
-    feature_extractor = load_model(f'{model_dir}/facenet_keras.h5')
+    # feature_extractor = load_model(f'{model_dir}/facenet_keras.h5',compile=False)
+    feature_extractor = onnxruntime.InferenceSession(f'{model_dir}/facenet_onnx.onnx')
 
 
 def l2_normalize(x, axis=-1, epsilon=1e-10):
@@ -110,16 +111,18 @@ class FaceRecognition():
         '''
         from tqdm import tqdm
         feature_list = []
+        featurelist_append = feature_list.append
         for item in tqdm(img_paths):
             try:
                 name = os.path.basename(item).split(self.sep)[0]
                 img = face_align(item)
                 white_img = prewhiten(img)
                 white_img = white_img[np.newaxis, :]
-                with graph.as_default():
-                    feature = l2_normalize(np.concatenate(
-                        feature_extractor.predict(white_img)))
-                    feature_list.append({'label': name, 'feature': feature})
+                feed = dict([(input.name, white_img.astype(np.float32)) for n, input in enumerate(feature_extractor.get_inputs())])
+                feature = l2_normalize(np.concatenate(
+                    feature_extractor.run(None,feed)))
+                    # feature_list.append({'label': name, 'feature': feature})
+                featurelist_append({'label': name, 'feature': feature})
             except Exception as e:
                 print(item, e)
         # print(feature_list)
@@ -133,8 +136,10 @@ class FaceRecognition():
         people_name = df['label'].tolist()
         people_feature = np.array(df['feature'].tolist())
         compelte = []
+        compelte_append = compelte.append
         try:
             img_feature = self.get_feature([img_path])[0]['feature']
+            dist_func = partial(distance.euclidean, v=img_feature)
 
             # print(cosine_similarity_scores)
             # print('min',np.min(cosine_similarity_scores),'max',np.max(cosine_similarity_scores))
@@ -142,13 +147,16 @@ class FaceRecognition():
             filename = ''
             for (person_name, person_feature) in zip(people_name, people_feature):
                 # dist = np.linalg.norm(person_feature.reshape(-1,1) - img_feature.reshape(-1,1),ord=2)
-                dist = distance.euclidean(person_feature, img_feature)
+                # dist = distance.euclidean(person_feature, img_feature)
+                dist = dist_func(person_feature)
                 # print(person_name,dist)
                 if dist < min_dist:
                     min_dist = dist
                     filename = person_name
                 if dist < self.threshold:
-                    compelte.append(
+                    # compelte.append(
+                    #     {'photoID': person_name, 'confidence': dist})
+                    compelte_append(
                         {'photoID': person_name, 'confidence': dist})
                 # compelte.append({'photoID': person_name, 'confidence': dist})
         except Exception as e:
@@ -174,7 +182,7 @@ if __name__ == "__main__":
     from glob import glob
 
     # facerecognition.compare_similarity(people_data, 'test_data/e1.png')
-    img_list = glob('test_data/*')
+    img_list = glob('test_data/val_img/*')
     img_list.sort()
     for img in img_list:
         st = time()
